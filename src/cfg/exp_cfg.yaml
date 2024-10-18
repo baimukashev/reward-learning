@@ -1,0 +1,47 @@
+defaults:
+    - _self_
+    - env_agent_algo: cheetah_ppo_maxent
+#     - override hydra/sweeper: optuna
+#     - override hydra/sweeper/sampler: random  # tpe
+#     - override hydra/launcher: ray # submitit_local # joblib # ray
+#     # - override hydra/hydra_logging: disabled
+#     # - override hydra/job_logging: disabled
+
+# common params
+env_name: ${env_name}
+agent_name: ${agent_name}
+algo_name: ${algo_name}
+exp_name: ${env_name}___group_${group_name}/run_default
+seed: 415
+device: 'cuda'
+expert_only: False
+fast: False
+testing: True
+test_epoch: 1
+test_num: 5
+save_freq : 10
+log_freq : 1
+
+load_expert: True
+load_data: True
+feats_selected: []
+feats_method: 'proposed' # random # first # manual
+normalize_feats: False
+random_init: True
+grad_clip: True
+
+# wandb
+track: True
+use_wandb: True
+wandb_entity: 'wandb_account'
+wandb_project_name: CoRL___${env_name}
+group_name: default
+notes: ''
+sync_tb: False
+render: False
+
+# parallelization
+n_threads: 10       # joblib data collection
+run_suffix: 0
+results_path: ''
+hydra_config: ''

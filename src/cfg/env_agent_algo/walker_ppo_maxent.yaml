@@ -1,0 +1,65 @@
+# @package _global_
+# Env parameters
+env_name: Walker2d-v4
+wrapper_class: WalkerWrapper
+wrapper_kwargs: {
+                "reward_path": None,
+                "env_name": Walker2d-v4,
+                "scaler_path": None,
+                "configs": None
+                }
+
+# Agent Policy  parameters
+agent_name: sb_sac
+n_envs: 4
+batch_size: 256
+n_cpu: ${n_envs}
+policy_type: "MlpPolicy"
+# pi_size: 128
+vf_size: ${pi_size}
+learning_starts: 10000
+verbose: 0
+tensorboard_log: 'checkpoints/${exp_name}/logs/'
+
+init_total_timesteps: 1.4e6
+init_learning_rate: 3e-4
+init_gamma: 0.99
+init_pi_size: 256
+
+# IRL parameters                   
+algo_name: maxent
+feats_selected: []
+feats_method: 'random'
+
+learning_rate: ${init_learning_rate}
+total_timesteps: ${init_total_timesteps}
+gamma: ${init_gamma}
+pi_size: ${init_pi_size}
+scaler_params: None
+path_to_expert: "data/Walker2d-v4/ppo_expert"
+path_to_data: "data/Walker2d-v4/"
+path_to_basis: ""
+
+len_traj: 1000
+n_trajs: 150
+lr : 0.05
+use_adam: True
+gamma_feat: 1.0
+epochs: 50
+d_states: 3
+alpha_decay: 0.99
+samples_per_state: 1
+
+# # sweep parameters
+# hydra:
+#   sweeper:
+#     params:
+#       lr: choice(0.2, 0.4, 0.6, 0.8, 1.0)
+#       gamma_feat: range(0.92, 1, 0.02)
+#       n_trajs: choice(100, 200, 300)
+#       len_traj: choice(100, 150, 200)
+#       epochs: choice(30, 40, 50)
+#       total_timesteps: choice(1e6, 1.5e6, 2e6)
+#       learning_rate:  choice(1e-5, 5e-5, 8e-5)
+#       gamma: range(0.94, 1, 0.02)
+#       pi_size:  choice(128, 256, 512)
