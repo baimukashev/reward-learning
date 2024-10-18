@@ -1,4 +1,4 @@
-# reward-learning
+# Transparent Reward Model
 This repo contains source code for 
 [Learning Transparent Reward Models via Unsupervised Feature Selection](https://openreview.net/forum?id=2sg4PY1W9d),
 Daulet Baimukashev, Gokhan Alcan, Kevin Sebastian Luck, Ville Kyrki, CoRL 2024.
@@ -16,7 +16,6 @@ validate our method’s performance in various robotic environments with continu
 * Jax
 
 Install all the required packages in conda environment by running:
-
 ```sh
 conda env create -f environment.yml
 ```
@@ -25,7 +24,6 @@ conda env create -f environment.yml
 The data can be downloaded from this [link](https://drive.google.com/drive/folders/1by0v5mVIfiayZ_b03xRjamwzEoHdGzMV?usp=drive_link),
 
 Alternatively, data can be collected by training RL policy
-
 ```sh
 sh train_expert.sh
 ```
@@ -37,13 +35,11 @@ Configuration files for all environments are located in ```src/cfg/```.
 Reward learning consists of two steps: extracting feature set and learning feature weights.
 
 1. To find features, run:
-
 ```sh
 python extract_features.py
 ```
 
 2. To learn feature weights, run scripts using the examples from:
-
 ```sh
 run_expertiments.sh
 ```
