@@ -1,6 +1,6 @@
 # Transparent Reward Model
 This repo contains source code for 
-[Learning Transparent Reward Models via Unsupervised Feature Selection](https://openreview.net/forum?id=2sg4PY1W9d),
+[Learning Transparent Reward Models via Unsupervised Feature Selection](https://arxiv.org/abs/2410.18608),
 Daulet Baimukashev, Gokhan Alcan, Kevin Sebastian Luck, Ville Kyrki, CoRL 2024.
 
 We propose a novel approach to construct compact and transparent reward models from automatically selected state features. These inferred rewards have an explicit form and enable the learning of policies that closely match expert
