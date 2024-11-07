@@ -21,7 +21,7 @@ conda env create -f environment.yml
 ```
 
 ## Data
-The data can be downloaded from this [link](https://drive.google.com/drive/folders/1by0v5mVIfiayZ_b03xRjamwzEoHdGzMV?usp=drive_link),
+The data can be downloaded from this [link](https://drive.google.com/drive/folders/1by0v5mVIfiayZ_b03xRjamwzEoHdGzMV?usp=sharing),
 
 Alternatively, data can be collected by training RL policy
 ```sh
