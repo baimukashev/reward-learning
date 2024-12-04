@@ -373,7 +373,7 @@ def plot_regression_results(X, y, ind_top, verbose, folder_path):
 
 
 def save_selected_basis_functions(selected_basis, all_variables, env_name):
-    filepath = f"tmp/{env_name}/{env_name}_basis.joblib"
+    filepath = f"tmp/{env_name}_basis.joblib"
     save_symbolic_basis_functions_joblib(
         selected_basis, all_variables, filepath=filepath
     )
