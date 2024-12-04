@@ -4,9 +4,6 @@ import numpy as np
 import torch
 import hydra
 
-os.environ["NUMEXPR_MAX_THREADS"] = "128"
-os.environ["WANDB_SILENT"] = "true"
-
 @hydra.main(config_path="src/cfg", config_name="exp_cfg", version_base=None)
 def main(cfg):
     seed = cfg["seed"]
