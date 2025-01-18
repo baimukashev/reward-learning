@@ -1,4 +1,4 @@
-!/bin/bash
+#!/bin/bash
 
 # train expert for selected env
 python run_experiments.py \
@@ -11,5 +11,4 @@ python run_experiments.py \
   sync_tb=True \
   expert_only=True \
   seed=10 \
-  init_total_timesteps=1e6\
-  n_traj=200
+  init_total_timesteps=1e6

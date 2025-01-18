@@ -32,6 +32,10 @@ def save_array_plot(array, filename):
 
 
 def filter_outliers(mu_tau, logP_tau, remove_outliers, last=True):
+    """
+    Optionally remove outliers(trajectories with low rewards as expert data is expected to be near-optimal). 
+    by slicing off M samples from either the highest or lowest end.
+    """
     if remove_outliers:
         if last:
             sorted_indices_x = np.argsort(logP_tau)[:-20]

@@ -11,17 +11,14 @@ class PPOAgent(Agent):
         self.configs = cfg
         self.env = env
         if use_init_params:
-            pi_size = self.cfg["init_pi_size"]
-            vf_size = self.cfg["init_pi_size"]
-            gamma = self.cfg["init_gamma"]
-            learning_rate = self.cfg["init_learning_rate"]
-            self.total_timesteps = self.cfg["init_total_timesteps"]
+            size_key_prefix = "init_"
         else:
-            pi_size = self.cfg["pi_size"]
-            vf_size = self.cfg["pi_size"]
-            gamma = self.cfg["gamma"]
-            learning_rate = self.cfg["learning_rate"]
-            self.total_timesteps = self.cfg["total_timesteps"]
+            size_key_prefix = ""
+        pi_size = self.cfg[f"{size_key_prefix}pi_size"]
+        vf_size = self.cfg.get(f"{size_key_prefix}vf_size", pi_size)
+        gamma = self.cfg[f"{size_key_prefix}gamma"]
+        learning_rate = self.cfg[f"{size_key_prefix}learning_rate"]
+        self.total_timesteps = self.cfg[f"{size_key_prefix}total_timesteps"]
 
         self.policy = PPO(
             "MlpPolicy",

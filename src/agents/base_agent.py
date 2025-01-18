@@ -1,25 +1,28 @@
+from abc import ABC, abstractmethod
 import numpy as np
 import torch
 from gymnasium.experimental.wrappers.rendering import RecordVideoV0
 
 
-class Agent:
+class Agent(ABC):
     def __init__(self, cfg) -> None:
         self.cfg = cfg
+        self.policy = None
 
+    @abstractmethod
     def act(self, obs):
         pass
 
-    def learn(self, obs):
+    @abstractmethod
+    def learn(self, logname=None):
         pass
 
-    def save(self, obs):
+    @abstractmethod
+    def save(self, path):
         pass
 
-    def test(self, obs):
-        pass
-
-    def load(self, obs):
+    @abstractmethod
+    def load(self, path, env=None, custom_objects=None):
         pass
 
     def save_render(
@@ -33,7 +36,6 @@ class Agent:
     ):
 
         dur = self.cfg["len_traj"]
-        model = self.policy
         rewards = []
         for idx in range(test_num):
             # env = gym.make(self.cfg["env_name"], render_mode="rgb_array")
@@ -58,7 +60,7 @@ class Agent:
             episode_reward = 0
             done = False
             while ind < dur and not done and not terminated:
-                action, *_ = model.predict(torch.tensor(obs))
+                action, *_ = self.policy.predict(torch.tensor(obs))
                 obs, reward, done, terminated, info = env.step(action)
                 episode_reward += reward
                 ind += 1

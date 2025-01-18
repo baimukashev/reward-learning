@@ -12,4 +12,3 @@ python run_experiments.py \
   track=False \
   env_agent_algo=cheetah_ppo_maxent \
   path_to_expert="checkpoints/HalfCheetah-v4___group_{}/run_{}/files/ppo_expert"
-  
