@@ -25,7 +25,7 @@ def select_top_features(
     ye: np.ndarray,
     all_variables: list,
     feats_names: list,
-    score_threshold: float = 0.7,
+    score_thresh: float = 0.7,
     n_selected: int = 20,
     env_name: str = None,
     save: bool = None,
@@ -37,7 +37,7 @@ def select_top_features(
 
     1) We split X (and y) with KFold (n_splits=10).
     2) Perform F-test (f_regression) on the training split.
-    3) Normalize absolute F-values, pick features above 'score_threshold'.
+    3) Normalize absolute F-values, pick features above 'score_thresh'.
     4) Collect feature indices across folds -> pick the most frequent ones.
 
     :param X: (N, d) entire data.
@@ -46,7 +46,7 @@ def select_top_features(
     :param ye: (Ne,) expert-only target array.
     :param all_variables: List of symbolic variables of features .
     :param feats_names: List of sympy expressions or string names.
-    :param score_threshold: Normalized threshold for F-values
+    :param score_thresh: Normalized threshold for F-values
     :param n_selected: Number of top features to keep after cross-validation.
     :param env_name: Name of environment for saving.
     :param save: If True, save the selected basis functions to file.
@@ -55,7 +55,7 @@ def select_top_features(
 
     :return: list of indices of the top features in feats_names.
     """
-    original_feats_names = feats_names.copy()
+    init_feats_names = feats_names.copy()
     num_feats = len(feats_names)
 
     kf = KFold(n_splits=10, shuffle=True, random_state=42)
@@ -71,26 +71,28 @@ def select_top_features(
         f_corr_cv = np.abs(f_corr_cv)
         f_corr_cv = (f_corr_cv / np.max(f_corr_cv)).astype(float)
 
-        ind_top_cv = [i for i in range(num_feats) if f_corr_cv[i] > score_threshold]
+        ind_top_cv = [i for i in range(num_feats) if f_corr_cv[i] > score_thresh]
         selected_features.extend(ind_top_cv)
 
     # Count how often each feature index was selected across folds
-    selected_features_counts = pd.Series(selected_features).value_counts()
+    feats_counts = pd.Series(selected_features).value_counts()
 
     # Take the top 'n_selected' indices
-    top_features_indices = selected_features_counts.head(n_selected).index.to_list()
-    important_features = [feats_names[i] for i in top_features_indices]
+    top_feats_indices = feats_counts.head(n_selected).index.to_list()
+    important_feats = [feats_names[i] for i in top_feats_indices]
 
-    sign_importance = [f_corr_cv_orig[i] for i in top_features_indices]
+    sign_importance = [f_corr_cv_orig[i] for i in top_feats_indices]
     print("Top important features based on F-test and cross-validation:")
     norm_factor = np.max(f_corr_cv_orig) if np.max(f_corr_cv_orig) != 0 else 1.0
-    for feature, i_idx, s_val in zip(important_features, top_features_indices, sign_importance):
+    for feature, i_idx, s_val in zip(
+        important_feats, top_feats_indices, sign_importance
+    ):
         print(i_idx, feature, s_val / norm_factor)
 
     # Re-map to original indexing if feats_names got modified
-    ind_top_original = [original_feats_names.index(feat) for feat in important_features]
-    selected_basis = [original_feats_names[i] for i in ind_top_original]
-    
+    ind_top_original = [init_feats_names.index(feat) for feat in important_feats]
+    selected_basis = [init_feats_names[i] for i in ind_top_original]
+
     # Optionally save the chosen features
     if save:
         print(f"\nSelected basis functions: {selected_basis}")
@@ -98,11 +100,15 @@ def select_top_features(
 
     # (Optional) Evaluate how well these features can linearly predict y
     if verbose:
-        r2_train, r2_test = plot_regression_results(Xe, ye, ind_top_original, verbose, folder_path)
-        print(f"\n({len(top_features_indices)}) / ({len(feats_names)}) features "
-              f"- R2 train/test: {r2_train:.3f}/{r2_test:.3f}")
+        r2_train, r2_test = plot_regression_results(
+            Xe, ye, ind_top_original, verbose, folder_path
+        )
+        print(
+            f"\n({len(top_feats_indices)}) / ({len(feats_names)}) features "
+            f"- R2 train/test: {r2_train:.3f}/{r2_test:.3f}"
+        )
 
-    return top_features_indices
+    return top_feats_indices
 
 
 def extract_features():
@@ -110,7 +116,7 @@ def extract_features():
     for (
         env_name,
         dims,
-        score_threshold,
+        score_thresh,
         remove_outliers,
         n_selected,
         num_chunks,
@@ -118,7 +124,7 @@ def extract_features():
         crop_last,
         n_agent,
     ) in [
-        ("HalfCheetah-v4", 17, 0.6, False, 12, 40, False, False, 50),  
+        ("HalfCheetah-v4", 17, 0.6, False, 12, 150, False, False, 50),
         # ("Walker2d-v4", 17, 0.3, True, 16, 150, True, True, 50),
         # ("Ant-v4", 27, 0.6, True, 20, 150, True, False, 20),
         # ("Hopper-v4", 11, 0.6, False, 10, 99, True, False, 20),
@@ -136,17 +142,20 @@ def extract_features():
         print(f"\n----------Extracting features for ----{env_name}")
         folder_path = f"tmp/{env_name}/"
         os.makedirs(folder_path, exist_ok=True)
-        
+
         trajs, rewards, expert_ts, non_expert_trajs, non_expert_ts = load_data(
             env_name, normalize, num_chunks, gamma
         )
         trajs, means, stds = normalize_trajs_std(trajs, norm_type=norm_type)
         print("Trajs size: ", len(trajs))
-        non_expert_trajs, _, _ = normalize_trajs_std(non_expert_trajs, norm_type=norm_type)
+        non_expert_trajs, _, _ = normalize_trajs_std(
+            non_expert_trajs, norm_type=norm_type
+        )
 
         # load or compute logP_tau
+        fname = f"tmp/{env_name}/logP_tau_{data_path}_{num_chunks}.npy"
         try:
-            logP_tau = np.load(f"tmp/{env_name}/logP_tau_{data_path}_{num_chunks}.npy")
+            logP_tau = np.load(fname)
             print("Loaded logP_tau from file")
         except Exception as e:
             print("...Computing logP_tau")
@@ -159,8 +168,8 @@ def extract_features():
                 kde_succ_states,
                 use_marginal=use_marginal,
             )
-            np.save(f"tmp/{env_name}/logP_tau_{data_path}_{num_chunks}.npy", logP_tau)
-        
+            np.save(fname, logP_tau)
+
         # create symbolic basis functions
         all_basis_functions, all_variables = create_all_symbolic_basis_functions(
             dims=dims,
@@ -170,10 +179,10 @@ def extract_features():
         feats = compute_numerical_values_for_all_trajs_optimized(
             all_basis_functions, all_variables, trajs
         )
-        
+
         if verbose:
             save_array_plot(logP_tau, f"{folder_path}/logP_tau.png")
-        
+
         mu_tau = find_feature_trajs(len(all_basis_functions), feats, gamma=gamma)
         mu_tau_expert, logP_tau_expert = filter_outliers(
             mu_tau, logP_tau, remove_outliers, crop_last
@@ -206,13 +215,14 @@ def extract_features():
             logP_tau_expert,
             all_variables,
             all_basis_functions,
-            score_threshold,
+            score_thresh,
             n_selected=n_selected,
             env_name=env_name,
             save=save,
             verbose=verbose,
             folder_path=None,
         )
+
 
 if __name__ == "__main__":
     extract_features()

@@ -1,8 +1,8 @@
-import os
 import random
 import numpy as np
 import torch
 import hydra
+
 
 @hydra.main(config_path="src/cfg", config_name="exp_cfg", version_base=None)
 def main(cfg):

@@ -1,6 +1,7 @@
 from abc import ABCMeta
 from abc import abstractmethod
 
+
 class BaseAlgo(object, metaclass=ABCMeta):
     """Abstract agent class."""
 

@@ -1,7 +1,6 @@
 import os
 import sys
 import signal
-import csv
 import random
 import numpy as np
 import ot
@@ -14,16 +13,24 @@ from stable_baselines3.common.env_util import make_vec_env
 from ..algorithms.base_algo import BaseAlgo
 from ..agents.sb3_ppo import PPOAgent
 from ..agents.sb3_sac import SACAgent
-from ..envs.wrappers import *
+from ..envs.wrappers import (
+    BaseEnvWrapper,
+    WalkerWrapper,
+    HopperWrapper,
+    AntWrapper,
+    CheetahWrapper,
+)
 from ..util.feature_gen import (
     find_feature_expectations,
     generate_trajectories,
 )
 
+
 def signal_handler(sig, frame):
     print("Interrupt received, shutting down...")
     wandb.finish()
     sys.exit(0)
+
 
 class ContMaxEntIRL(BaseAlgo):
     """
@@ -40,6 +47,8 @@ class ContMaxEntIRL(BaseAlgo):
         self.alpha = None
         self.run = None
         self.exp_name = self.cfg["exp_name"]
+        self.checkpoint_dir = None
+        self.files_dir = None
 
     def train(self):
         """
@@ -48,7 +57,7 @@ class ContMaxEntIRL(BaseAlgo):
         2. Train or load expert policy.
         3. Generate or load expert demonstrations.
         4. If expert_only, then train expert policy
-        4. Run the IRL training loop (update reward via alpha, train new agent)
+        5. Run the IRL training loop (update reward via alpha, train new agent)
         """
         self._configure_experiment()
 
@@ -57,8 +66,7 @@ class ContMaxEntIRL(BaseAlgo):
         self.rollout_env = self._create_env()
         self._train_or_load_expert()
 
-        # Test expert 
-        # if reward stats are low, the weights may not be loaded correctly
+        # Test expert
         expert_results = self._test_expert()  # returns [mean, std] if tested
         print(f"Expert results: {expert_results}")
 
@@ -72,6 +80,7 @@ class ContMaxEntIRL(BaseAlgo):
         dist = self._run_irl_loop(expert_trajs, expert_ts, expert_results)
         if self.run is not None:
             self.run.finish()
+
         return dist
 
     def log_data(self, epoch, alpha, grad, dist, lr):
@@ -96,6 +105,7 @@ class ContMaxEntIRL(BaseAlgo):
     def _configure_experiment(self):
         """
         Sets up signal handlers, W&B experiment tracking, Hydra config paths, etc.
+        Also defines checkpoint/log directories.
         """
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
@@ -125,15 +135,19 @@ class ContMaxEntIRL(BaseAlgo):
             # Update exp_name to reflect W&B run
             self.exp_name = f"{env_name}___group_{group_name}/run_{wandb.run.name}"
             self.cfg["exp_name"] = self.exp_name
+            # For SB3's TensorBoard logs:
             self.cfg["tensorboard_log"] = f"checkpoints/{self.exp_name}/logs/"
 
         # Hydra config references
         self.cfg["hydra_config"] = HydraConfig.get()
         self.cfg["results_path"] = HydraConfig.get().sweep.dir
 
-        # Create necessary directories
-        if not os.path.exists(f"checkpoints/{self.exp_name}/files/"):
-            os.makedirs(f"checkpoints/{self.exp_name}/files/")
+        # Define directories for checkpoints and files
+        self.checkpoint_dir = f"checkpoints/{self.exp_name}"
+        self.files_dir = os.path.join(self.checkpoint_dir, "files")
+
+        if not os.path.exists(self.files_dir):
+            os.makedirs(self.files_dir)
 
         print(
             f"\n\n---- Started ... |{self.exp_name} | "
@@ -146,7 +160,8 @@ class ContMaxEntIRL(BaseAlgo):
         Creates or loads the expert policy (PPO/SAC).
         """
         self.expert = self._create_agent(use_init_params=True)
-        self.expert.policy.tensorboard_log = f"checkpoints/{self.exp_name}/logs/"
+        # Update tensorboard log to our checkpoint directory
+        self.expert.policy.tensorboard_log = os.path.join(self.checkpoint_dir, "logs")
 
         if self.cfg["load_expert"]:
             self.expert.load(
@@ -157,13 +172,13 @@ class ContMaxEntIRL(BaseAlgo):
                     "action_space": self.env.action_space,
                 },
             )
-            with open(f"checkpoints/{self.exp_name}/readme.txt", "w") as f:
+            with open(os.path.join(self.files_dir, "readme.txt"), "w") as f:
                 f.write(
                     f'This run uses the saved model from {self.cfg["path_to_expert"]}'
                 )
         else:
             self.expert.learn(logname="Expert")
-            self.expert.save(f"checkpoints/{self.exp_name}/files/ppo_expert")
+            self.expert.save(os.path.join(self.files_dir, "ppo_expert"))
 
     def _test_expert(self):
         """
@@ -172,7 +187,7 @@ class ContMaxEntIRL(BaseAlgo):
         if not self.cfg["testing"]:
             return [0, 0]
 
-        video_path = f"checkpoints/{self.exp_name}/files/ppo_expert"
+        video_path = os.path.join(self.files_dir, "ppo_expert")
         expert_results = self.expert.save_render(
             video_dir=video_path,
             test_num=self.cfg["test_num"],
@@ -198,14 +213,15 @@ class ContMaxEntIRL(BaseAlgo):
         state_minmax = np.vstack(
             [np.min(expert_trajs, axis=0), np.max(expert_trajs, axis=0)]
         )
-        np.save(f"tmp/{self.cfg['env_name']}_state_minmax.npy", state_minmax)
+        tmp_minmax_path = f"tmp/{self.cfg['env_name']}_state_minmax.npy"
+        np.save(tmp_minmax_path, state_minmax)
         return expert_trajs, expert_ts
 
     def _run_irl_loop(self, expert_trajs, expert_ts, expert_results):
         """
         Runs the main IRL loop:
         1. Initialize parameters for the reward model.
-        2. For each epoch: 
+        2. For each epoch:
            - Update env with new reward model
            - Train a new agent
            - Collect rollouts
@@ -223,7 +239,7 @@ class ContMaxEntIRL(BaseAlgo):
         use_adam = self.cfg["use_adam"]
 
         # Initialize reward parameters alpha
-        alpha_path = f"checkpoints/{self.exp_name}/files/alpha_temp"
+        alpha_path = os.path.join(self.files_dir, "alpha_temp")
         self.alpha = np.array([random.uniform(-1, 1) for _ in range(d_states)])
         np.save(alpha_path, self.alpha)
 
@@ -237,7 +253,7 @@ class ContMaxEntIRL(BaseAlgo):
         epsilon = 5e-8
         m_w, v_w, t = 0, 0, 0
 
-        dist = 0 
+        dist = 0
         for epoch in range(1, epochs + 1):
             print(f"Epoch {epoch}/{epochs}")
 
@@ -260,7 +276,7 @@ class ContMaxEntIRL(BaseAlgo):
 
             # Compute Wasserstein distance (just for tracking)
             expert_size = min(20000, expert_trajs.shape[0])
-            agent_size = min(20000, agent_trajs.shape[0])  # <-- was agent_trajs.shape
+            agent_size = min(20000, agent_trajs.shape[0])
             dmatrix = ot.dist(
                 expert_trajs[:expert_size, :], agent_trajs[:agent_size, :]
             )
@@ -273,8 +289,8 @@ class ContMaxEntIRL(BaseAlgo):
                 if self.cfg["testing"] and (
                     epoch % self.cfg["test_epoch"] == 0 or epoch == 1
                 ):
-                    video_path = (
-                        f"checkpoints/{self.exp_name}/files/ppo_learned_reward_ep{epoch}"
+                    video_path = os.path.join(
+                        self.files_dir, f"ppo_learned_reward_ep{epoch}"
                     )
                     agent_results = self.agent.save_render(
                         video_dir=video_path,
@@ -282,17 +298,37 @@ class ContMaxEntIRL(BaseAlgo):
                         test_env=self.rollout_env,
                     )
                     # Log to wandb
-                    self.run.log({"avg_test_reward/MEAN_reward_agent": agent_results[0]}, commit=False)
-                    self.run.log({"avg_test_reward/STD_reward_agent": agent_results[1]}, commit=False)
-                    self.run.log({"avg_test_reward/MEAN_reward_expert": expert_results[0]}, commit=False)
-                    self.run.log({"avg_test_reward/STD_reward_expert": expert_results[1]}, commit=False)
+                    self.run.log(
+                        {"avg_test_reward/MEAN_reward_agent": agent_results[0]},
+                        commit=False,
+                    )
+                    self.run.log(
+                        {"avg_test_reward/STD_reward_agent": agent_results[1]},
+                        commit=False,
+                    )
+                    self.run.log(
+                        {"avg_test_reward/MEAN_reward_expert": expert_results[0]},
+                        commit=False,
+                    )
+                    self.run.log(
+                        {"avg_test_reward/STD_reward_expert": expert_results[1]},
+                        commit=False,
+                    )
 
             # Save model & reward
             if epoch % self.cfg["save_freq"] == 0 or epoch == 1:
-                self.agent.save(f"checkpoints/{self.exp_name}/files/ppo_learned_reward_ep{epoch}")
-                np.save(f"checkpoints/{self.exp_name}/files/alpha_ep{epoch}", self.alpha)
-                np.save(f"checkpoints/{self.exp_name}/files/agent_trajs_learned{epoch}", agent_trajs)
-                np.save(f"checkpoints/{self.exp_name}/files/agent_ts_learned{epoch}", agent_ts)
+                self.agent.save(
+                    os.path.join(self.files_dir, f"ppo_learned_reward_ep{epoch}")
+                )
+                np.save(os.path.join(self.files_dir, f"alpha_ep{epoch}"), self.alpha)
+                np.save(
+                    os.path.join(self.files_dir, f"agent_trajs_learned{epoch}"),
+                    agent_trajs,
+                )
+                np.save(
+                    os.path.join(self.files_dir, f"agent_ts_learned{epoch}"),
+                    agent_ts,
+                )
 
             # Update alpha (Adam or vanilla)
             if use_adam:
@@ -355,7 +391,7 @@ class ContMaxEntIRL(BaseAlgo):
 
         trs = [tr for (tr, _, _) in res]
         ids = [id_ for (_, id_, _) in res]
-        rs  = [r  for (_, _, r) in res]
+        rs = [r for (_, _, r) in res]
 
         trajs = np.concatenate(trs)
         ts = np.concatenate(ids)
@@ -367,23 +403,34 @@ class ContMaxEntIRL(BaseAlgo):
         Load expert trajs/ts from disk and truncate to 'n_trajs * len_traj'.
         """
         expert_trajs = np.load(f"{path_to_data}expert_trajs.npy")
-        expert_ts    = np.load(f"{path_to_data}expert_ts.npy")
+        expert_ts = np.load(f"{path_to_data}expert_ts.npy")
 
         max_size = n_trajs * self.cfg["len_traj"]
         expert_trajs = expert_trajs[:max_size]
-        expert_ts    = expert_ts[:max_size]
+        expert_ts = expert_ts[:max_size]
 
-        with open(f"checkpoints/{self.exp_name}/readme.txt", "w") as f:
-            f.write(f"This uses data of N={self.cfg['n_trajs']} trajs from {self.cfg['path_to_data']}")
+        # Create a small readme
+        readme_path = os.path.join(self.files_dir, "readme.txt")
+        with open(readme_path, "w") as f:
+            f.write(
+                f"This uses data of N={self.cfg['n_trajs']} trajs "
+                f"from {self.cfg['path_to_data']}"
+            )
         return expert_trajs, expert_ts
 
     def _save_data(self, expert_trajs, expert_ts, rs):
         """
         Save generated expert data (trajs, ts, rewards) to disk.
         """
-        np.save(f"checkpoints/{self.exp_name}/files/expert_trajs_{self.cfg['n_trajs']}", expert_trajs)
-        np.save(f"checkpoints/{self.exp_name}/files/expert_ts_{self.cfg['n_trajs']}",    expert_ts)
-        np.save(f"checkpoints/{self.exp_name}/files/expert_rs_{self.cfg['n_trajs']}",    rs)
+        np.save(
+            os.path.join(self.files_dir, f"expert_trajs_{self.cfg['n_trajs']}"),
+            expert_trajs,
+        )
+        np.save(
+            os.path.join(self.files_dir, f"expert_ts_{self.cfg['n_trajs']}"),
+            expert_ts,
+        )
+        np.save(os.path.join(self.files_dir, f"expert_rs_{self.cfg['n_trajs']}"), rs)
 
     def _set_simple_params(self):
         self.cfg.total_timesteps = 5000

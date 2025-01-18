@@ -6,6 +6,7 @@ from .helper import (
     compute_with_precompiled_functions,
 )
 from .data_config import ENVIRONMENT_CONFIGS
+
 PRECOMPILED_FUNC = None
 
 
@@ -77,9 +78,7 @@ def cheetah_feat_extract(states, cfg):
         notex = cfg["path_to_basis"]
         if PRECOMPILED_FUNC is None:
             filepath = f"tmp/{env_name}_basis.joblib"
-            PRECOMPILED_FUNC = load_and_precompile_functions_joblib(
-                filepath
-            )
+            PRECOMPILED_FUNC = load_and_precompile_functions_joblib(filepath)
         feats = compute_with_precompiled_functions(PRECOMPILED_FUNC, states)
     else:
         NotImplementedError()
@@ -95,7 +94,7 @@ def walker_feat_extract(states, cfg):
     use_norm = cfg["normalize_feats"]
     if use_norm:
         states = Normalizer().fit_transform(states.reshape(1, -1)).squeeze()
-    
+
     feat_selection = cfg["feats_method"]
     feats = []
 
@@ -125,9 +124,7 @@ def walker_feat_extract(states, cfg):
         notex = cfg["path_to_basis"]
         if PRECOMPILED_FUNC is None:
             filepath = f"tmp/{env_name}_basis.joblib"
-            PRECOMPILED_FUNC = load_and_precompile_functions_joblib(
-                filepath
-            )
+            PRECOMPILED_FUNC = load_and_precompile_functions_joblib(filepath)
         feats = compute_with_precompiled_functions(PRECOMPILED_FUNC, states)
     else:
         NotImplementedError()
@@ -187,9 +184,7 @@ def ant_feat_extract(states, cfg):
         notex = cfg["path_to_basis"]
         if PRECOMPILED_FUNC is None:
             filepath = f"tmp/{env_name}_basis.joblib"
-            PRECOMPILED_FUNC = load_and_precompile_functions_joblib(
-                filepath
-            )
+            PRECOMPILED_FUNC = load_and_precompile_functions_joblib(filepath)
         feats = compute_with_precompiled_functions(PRECOMPILED_FUNC, states)
     else:
         NotImplementedError()
@@ -205,7 +200,7 @@ def hopper_feat_extract(states, cfg):
     use_norm = cfg["normalize_feats"]
     if use_norm:
         states = Normalizer().fit_transform(states.reshape(1, -1)).squeeze()
-        
+
     feat_selection = cfg["feats_method"]
     feats = []
 
@@ -240,9 +235,7 @@ def hopper_feat_extract(states, cfg):
         notex = cfg["path_to_basis"]
         if PRECOMPILED_FUNC is None:
             filepath = f"tmp/{env_name}_basis.joblib"
-            PRECOMPILED_FUNC = load_and_precompile_functions_joblib(
-                filepath
-            )
+            PRECOMPILED_FUNC = load_and_precompile_functions_joblib(filepath)
         feats = compute_with_precompiled_functions(PRECOMPILED_FUNC, states)
     else:
         NotImplementedError()

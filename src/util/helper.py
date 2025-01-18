@@ -21,8 +21,8 @@ def reverse_range(y):
 
 def normalize_data_point(data_point, min_vals, max_vals):
     data_point = np.clip(data_point, min_vals, max_vals)
-    normalized_data_point = 2 * (data_point - min_vals) / (max_vals - min_vals) - 1
-    return normalized_data_point
+    normalized_data = 2 * (data_point - min_vals) / (max_vals - min_vals) - 1
+    return normalized_data
 
 
 def save_array_plot(array, filename):
@@ -33,7 +33,8 @@ def save_array_plot(array, filename):
 
 def filter_outliers(mu_tau, logP_tau, remove_outliers, last=True):
     """
-    Optionally remove outliers(trajectories with low rewards as expert data is expected to be near-optimal). 
+    Optionally remove outliers(trajectories with low rewards as
+    expert data is expected to be near-optimal).
     by slicing off M samples from either the highest or lowest end.
     """
     if remove_outliers:
@@ -89,7 +90,7 @@ def load_data(env_name, normalize, num_chunks, gamma):
     non_expert_ts = np.load(data_path + "non_expert_ts.npy")
 
     traj_chunks = divide_into_chunks(expert_trajs, expert_ts, num_chunks)
-    reward_chunks = divide_1d_array_into_chunks(expert_rs, expert_ts, num_chunks)
+    reward_chunks = divide_arr_into_chunks(expert_rs, expert_ts, num_chunks)
 
     non_expert_chunks = divide_into_chunks(non_expert_trajs, non_expert_ts, num_chunks)
 
@@ -103,13 +104,13 @@ def load_data(env_name, normalize, num_chunks, gamma):
     return traj_chunks, rewards, expert_ts, non_expert_chunks, non_expert_ts
 
 
-def divide_1d_array_into_chunks(data_array, time_indexes, num_chunks):
+def divide_arr_into_chunks(data_array, time_indexes, num_chunks):
     """
     Divide a 1D array into chunks based on sequential time indexes.
 
     Parameters:
     - data_array: The 1D array of shape (N,).
-    - time_indexes: The array representing sequential time indexes for each point.
+    - time_indexes: The array representing time indexes for each point.
 
     Returns:
     - chunks: A list of chunks, where each chunk is a 1D array.
@@ -138,7 +139,7 @@ def divide_into_chunks(data_array, time_indexes, num_chunks):
 
     Parameters:
     - data_array: The 2D array of shape (N, d).
-    - time_indexes: The array representing sequential time indexes for each point.
+    - time_indexes: The array representing time indexes for each point.
 
     Returns:
     - chunks: A list of chunks, where each chunk is a 2D array.
@@ -189,7 +190,7 @@ def compute_prob_marginal(n_batches, trajs, expert_ts, num_chunks, kde_states):
         for i in range(0, len(data), batch_size)
     )
     log_ps = np.concatenate(results)
-    logP_taui = divide_1d_array_into_chunks(log_ps, expert_ts, num_chunks)
+    logP_taui = divide_arr_into_chunks(log_ps, expert_ts, num_chunks)
     logP_tau = [traj.sum() for traj in logP_taui]
     return np.array(logP_tau)
 
@@ -197,13 +198,13 @@ def compute_prob_marginal(n_batches, trajs, expert_ts, num_chunks, kde_states):
 def compute_prob_seq(logP_tau, n_batches, trajs, num_chunks, kde_succ_states):
     data, time_ts = create_succ_points(trajs)
     n_jobs = -1  # Use all available cores
-    batch_size = int(np.ceil(len(data) / n_batches))  # For example, 10 batches
+    batch_size = int(np.ceil(len(data) / n_batches))  # 10 batches
     results = Parallel(n_jobs=n_jobs)(
         delayed(score_subset)(kde_succ_states, data[i : i + batch_size])
         for i in range(0, len(data), batch_size)
     )
     log_pss1 = np.concatenate(results)
-    logP_taui = divide_1d_array_into_chunks(log_pss1, time_ts, num_chunks)
+    logP_taui = divide_arr_into_chunks(log_pss1, time_ts, num_chunks)
     logP_tau2 = [traj.sum() for traj in logP_taui]
     logP_tau2 = np.array(logP_tau2)
     return logP_tau2 - logP_tau

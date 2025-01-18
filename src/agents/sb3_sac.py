@@ -19,7 +19,7 @@ class SACAgent(Agent):
         gamma = self.cfg[f"{size_key_prefix}gamma"]
         learning_rate = self.cfg[f"{size_key_prefix}learning_rate"]
         self.total_timesteps = self.cfg[f"{size_key_prefix}total_timesteps"]
-        
+
         self.policy = SAC(
             "MlpPolicy",
             env,
