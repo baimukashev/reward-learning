@@ -32,15 +32,15 @@ sh train_expert.sh
 ## Configuration
 Configuration files for all environments are located in ```src/cfg/```.
 
-## Learning rewards
+## Training
 Reward learning consists of two steps: extracting feature set and learning feature weights.
 
-1. To find features, run:
+1. To select important reward features and save symbolic expressions to file, run:
 ```sh
 python extract_features.py
 ```
 
-2. To learn feature weights, run scripts using the examples from:
+2. To learn feature weights, run training scripts using the examples from:
 ```sh
 run_expertiments.sh
 ```
