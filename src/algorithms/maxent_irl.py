@@ -208,13 +208,6 @@ class ContMaxEntIRL(BaseAlgo):
             self._save_data(expert_trajs, expert_ts, rs)
 
         print("Expert data size: ", expert_trajs.shape, expert_ts.shape)
-
-        # Save global state min/max
-        state_minmax = np.vstack(
-            [np.min(expert_trajs, axis=0), np.max(expert_trajs, axis=0)]
-        )
-        tmp_minmax_path = f"tmp/{self.cfg['env_name']}_state_minmax.npy"
-        np.save(tmp_minmax_path, state_minmax)
         return expert_trajs, expert_ts
 
     def _run_irl_loop(self, expert_trajs, expert_ts, expert_results):
@@ -389,13 +382,8 @@ class ContMaxEntIRL(BaseAlgo):
             for seed in range(trajs_num)
         )
 
-        trs = [tr for (tr, _, _) in res]
-        ids = [id_ for (_, id_, _) in res]
-        rs = [r for (_, _, r) in res]
-
-        trajs = np.concatenate(trs)
-        ts = np.concatenate(ids)
-        rs = np.concatenate(rs)
+        trajs, ts, rs = [np.concatenate(group) for group in zip(*res)]
+        import pdb; pdb.set_trace()
         return trajs, ts, rs
 
     def _load_data(self, path_to_data, n_trajs):
